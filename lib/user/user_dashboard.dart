@@ -378,10 +378,10 @@ class _HomeScreenState extends State<HomeScreen> {
     final player = AudioPlayer();
 
     // Use setSource to load sound from assets (no need for setSourceAsset in 6.1.0)
-    await player.setSource(AssetSource('asset/music/alarm.mp3'));
+    await player.setSource(AssetSource('music/alarm.mp3'));
 
     // Play the sound after setting the source
-    await player.play(AssetSource('asset/music/alarm.mp3'));
+    await player.play(AssetSource('music/alarm.mp3'));
   }
 
   Future<void> _updateAlarmStatus(int alarmId) async {

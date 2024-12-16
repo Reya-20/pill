@@ -36,7 +36,8 @@ class _AlarmScreenState extends State<AlarmScreen> {
   List<Map<String, dynamic>> _medicineData = [];
   List<Map<String, dynamic>> _patientData = [];
   List<Map<String, dynamic>> _alarms = [];
-
+  DateTime? _selectedStartDate;
+  DateTime? _selectedEndDate;
   @override
   void initState() {
     super.initState();
@@ -198,6 +199,17 @@ class _AlarmScreenState extends State<AlarmScreen> {
           'Medicine Reminder',
           style: TextStyle(fontWeight: FontWeight.w500),
         ),
+        actions: [
+          IconButton(
+            icon: Icon(
+              Icons.add_alarm,
+              color: Colors.white,
+            ),
+
+            onPressed: () => _showBottomSheet(context), // For adding a new reminder
+          ),
+        ],
+
         backgroundColor: Color(0xFF006D77),
         elevation: 0,
       ),
@@ -226,11 +238,7 @@ class _AlarmScreenState extends State<AlarmScreen> {
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showBottomSheet(context),
-        backgroundColor: Color(0xFF006D77),
-        child: Icon(Icons.add, size: 28),
-      ),
+
     );
   }
 
@@ -245,6 +253,7 @@ class _AlarmScreenState extends State<AlarmScreen> {
         padding: EdgeInsets.all(16),
         child: Row(
           children: [
+            // Alarm Time Container
             Container(
               padding: EdgeInsets.symmetric(vertical: 12, horizontal: 20),
               decoration: BoxDecoration(
@@ -252,7 +261,7 @@ class _AlarmScreenState extends State<AlarmScreen> {
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
-                alarm['time'] ?? '00:00 AM',
+                alarm['time'] ?? '00:00 AM',  // Default time if null
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
@@ -261,13 +270,18 @@ class _AlarmScreenState extends State<AlarmScreen> {
               ),
             ),
             SizedBox(width: 20),
+            // Alarm Details
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    alarm['pill_name'] ?? 'Unknown Pill',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87),
+                    alarm['pill_name'] ?? 'Unknown Pill',  // Default pill name if null
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
                   ),
                   SizedBox(height: 5),
                   Text(
@@ -277,120 +291,252 @@ class _AlarmScreenState extends State<AlarmScreen> {
                 ],
               ),
             ),
+            SizedBox(width: 10),
+            // Delete Button
+            IconButton(
+              onPressed: () {
+                final alarmId = alarm['id'];  // Check if 'alarm_id' exists
+                if (alarmId != null && alarmId is String) {
+                  _confirmDelete(alarmId);
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Invalid Alarm ID')),
+                  );
+                }
+              },
+              icon: Icon(Icons.delete, color: Colors.red),
+            ),
           ],
         ),
       ),
     );
   }
 
-  void _showBottomSheet(BuildContext context) {
-    showModalBottomSheet(
+// Function to show a confirmation dialog before deleting
+  void _confirmDelete(String alarmId) {
+    showDialog(
       context: context,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
       builder: (context) {
-        return Padding(
-          padding: EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Add Reminder',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
-              ),
-              SizedBox(height: 10),
-              DropdownButtonFormField<String>(
-                value: _selectedPillId,
-                items: _medicineData.map((medicine) {
-                  return DropdownMenuItem<String>(
-                    value: medicine['pill_id'],
-                    child: Text(medicine['pill_name']),
-                  );
-                }).toList(),
-                onChanged: (value) => setState(() => _selectedPillId = value),
-                decoration: InputDecoration(
-                  labelText: 'Select Pill',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              SizedBox(height: 10),
-              DropdownButtonFormField<String>(
-                value: _selectedPatientId,
-                items: _patientData.map((patient) {
-                  return DropdownMenuItem<String>(
-                    value: patient['patient_id'],
-                    child: Text(patient['patient_name']),
-                  );
-                }).toList(),
-                onChanged: (value) => setState(() => _selectedPatientId = value),
-                decoration: InputDecoration(
-                  labelText: 'Select Patient',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              SizedBox(height: 10),
-              TextField(
-                controller: _reminderMessageController,
-                decoration: InputDecoration(
-                  labelText: 'Reminder Message',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              SizedBox(height: 10),
-              GestureDetector(
-                onTap: () async {
-                  TimeOfDay? pickedTime = await showTimePicker(
-                    context: context,
-                    initialTime: _selectedTime,
-                  );
-                  if (pickedTime != null) {
-                    setState(() {
-                      _selectedTime = pickedTime;
-                    });
-                  }
-                },
-                child: AbsorbPointer(
-                  child: TextFormField(
-                    decoration: InputDecoration(
-                      labelText: 'Select Time',
-                      border: OutlineInputBorder(),
-                    ),
-                    readOnly: true,
-                    controller: TextEditingController(
-                        text: '${_selectedTime.format(context)}'),
-                  ),
-                ),
-              ),
-              SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  ElevatedButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.grey,
-                    ),
-                    child: Text('Close'),
-                  ),
-                  ElevatedButton(
-                    onPressed: () {
-                      _submitData();
-                      Navigator.pop(context);
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Color(0xFF006D77),
-                    ),
-                    child: Text('Save Reminder'),
-                  ),
-                ],
-              ),
-            ],
-          ),
+        return AlertDialog(
+          title: Text('Delete Alarm'),
+          content: Text('Are you sure you want to delete this alarm?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(), // Cancel
+              child: Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // Close dialog
+                _deleteAlarmFromDatabase(alarmId);
+              },
+              child: Text('Delete', style: TextStyle(color: Colors.red)),
+            ),
+          ],
         );
       },
     );
   }
+
+  void _deleteAlarmFromDatabase(String alarmId) async {
+    if (alarmId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Invalid Alarm ID')),
+      );
+      return;
+    }
+
+    final url = 'https://springgreen-rhinoceros-308382.hostingersite.com/delete_alarm.php';
+    final response = await http.post(
+      Uri.parse(url),
+      body: {
+        'id': alarmId,
+      },
+    );
+
+    if (response.statusCode == 200) {
+      final responseData = jsonDecode(response.body);
+      if (responseData['success']) {
+        setState(() {
+          _alarms.removeWhere((alarm) => alarm['id'] == alarmId);
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Alarm deleted successfully!')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to delete alarm: ${responseData['message']}')),
+        );
+      }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: ${response.statusCode}, ${response.body}')),
+      );
+    }
+
   }
+
+  void _showBottomSheet(BuildContext context) {
+    // Controllers for Start Date and End Date fields
+    TextEditingController startDateController = TextEditingController(
+      text: _selectedStartDate == null
+          ? ''
+          : '${_selectedStartDate!.toLocal()}'.split(' ')[0],
+    );
+    TextEditingController endDateController = TextEditingController(
+      text: _selectedEndDate == null
+          ? ''
+          : '${_selectedEndDate!.toLocal()}'.split(' ')[0],
+    );
+
+    showModalBottomSheet(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setModalState) {
+            return Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    DropdownButtonFormField<String>(
+                      value: _selectedPillId,
+                      items: _medicineData.map((medicine) {
+                        return DropdownMenuItem<String>(
+                          value: medicine['pill_id'],
+                          child: Text(medicine['pill_name']),
+                        );
+                      }).toList(),
+                      onChanged: (value) => setModalState(() {
+                        _selectedPillId = value!;
+                      }),
+                      decoration: InputDecoration(
+                        labelText: 'Select Pill',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    SizedBox(height: 10),
+                    DropdownButtonFormField<String>(
+                      value: _selectedPatientId,
+                      items: _patientData.map((patient) {
+                        return DropdownMenuItem<String>(
+                          value: patient['patient_id'],
+                          child: Text(patient['patient_name']),
+                        );
+                      }).toList(),
+                      onChanged: (value) => setModalState(() {
+                        _selectedPatientId = value!;
+                      }),
+                      decoration: InputDecoration(
+                        labelText: 'Select Patient',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    SizedBox(height: 10),
+                    TextFormField(
+                      controller: _reminderMessageController,
+                      decoration: InputDecoration(
+                        labelText: 'Reminder Message',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    SizedBox(height: 10),
+                    GestureDetector(
+                      onTap: () async {
+                        TimeOfDay? pickedTime = await showTimePicker(
+                          context: context,
+                          initialTime: _selectedTime,
+                        );
+                        if (pickedTime != null) {
+                          setModalState(() {
+                            _selectedTime = pickedTime;
+                          });
+                        }
+                      },
+                      child: AbsorbPointer(
+                        child: TextFormField(
+                          decoration: InputDecoration(
+                            labelText: 'Time',
+                            border: OutlineInputBorder(),
+                          ),
+                          controller: TextEditingController(
+                            text: _selectedTime.format(context),
+                          ),
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: 10),
+                    GestureDetector(
+                      onTap: () async {
+                        DateTime? pickedStartDate = await showDatePicker(
+                          context: context,
+                          initialDate: _selectedStartDate ?? DateTime.now(),
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime(2101),
+                        );
+                        if (pickedStartDate != null) {
+                          setModalState(() {
+                            _selectedStartDate = pickedStartDate;
+                            startDateController.text =
+                            '${_selectedStartDate!.toLocal()}'.split(' ')[0];
+                          });
+                        }
+                      },
+                      child: AbsorbPointer(
+                        child: TextFormField(
+                          decoration: InputDecoration(
+                            labelText: 'Start Date',
+                            border: OutlineInputBorder(),
+                          ),
+                          controller: startDateController,
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: 10),
+                    GestureDetector(
+                      onTap: () async {
+                        DateTime? pickedEndDate = await showDatePicker(
+                          context: context,
+                          initialDate: _selectedEndDate ?? DateTime.now(),
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime(2101),
+                        );
+                        if (pickedEndDate != null) {
+                          setModalState(() {
+                            _selectedEndDate = pickedEndDate;
+                            endDateController.text =
+                            '${_selectedEndDate!.toLocal()}'.split(' ')[0];
+                          });
+                        }
+                      },
+                      child: AbsorbPointer(
+                        child: TextFormField(
+                          decoration: InputDecoration(
+                            labelText: 'End Date',
+                            border: OutlineInputBorder(),
+                          ),
+                          controller: endDateController,
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: 20),
+                    ElevatedButton(
+                      onPressed: () {
+                        _submitData();
+                        Navigator.of(context).pop(); // Close the bottom sheet
+                      },
+                      child: Text('Save Reminder'),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+}

@@ -151,7 +151,7 @@ class _MedicineScreenState extends State<MedicineScreen> {
   }
 
   void _deleteMedicine(int index) {
-    // Get the pill_id from the medicine data
+    // Get the pill_id from the medicine data and convert it to an integer
     var pillId = _medicineList[index]['pill_id'];
 
     if (pillId == null) {
@@ -160,6 +160,17 @@ class _MedicineScreenState extends State<MedicineScreen> {
         backgroundColor: Colors.red,
       ));
       return;  // Early return if pill_id is null
+    }
+
+    // Ensure pillId is an integer (it might be a string from the list)
+    pillId = int.tryParse(pillId.toString()) ?? -1;  // Convert to int, or -1 if conversion fails
+
+    if (pillId == -1) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Error: Invalid pill_id format'),
+        backgroundColor: Colors.red,
+      ));
+      return;  // Early return if pillId is invalid
     }
 
     // Show confirmation dialog
@@ -183,7 +194,7 @@ class _MedicineScreenState extends State<MedicineScreen> {
                 bool success = await _deleteMedicineFromDB(pillId); // Pass pillId here
                 if (success) {
                   setState(() {
-                    _medicineList.removeAt(index);
+                    _medicineList.removeAt(index);  // Remove item from local list
                   });
                 }
                 Navigator.of(context).pop(); // Close the dialog

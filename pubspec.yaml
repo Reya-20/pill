@@ -98,6 +98,6 @@ flutter:
   assets:
     - asset/image/5-removebg-preview.png
     - asset/image/start_logo_above.png
-    - asset/music/alarm.mp3
+    - assets/music/alarm.mp3
+    - assets/music/notif.mp3
     - asset/image/splash.gif
-    - asset/music/alarm.mp3

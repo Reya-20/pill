@@ -98,15 +98,8 @@ class CustomDrawer extends StatelessWidget {
                 MaterialPageRoute(builder: (context) =>  HomeCareScreen()),
               );
             }),
-// Add WiFi settings for caregivers only
-          if (userRole == 1) ...[
-            _buildDrawerItem(context, Icons.wifi, 'WiFi Settings', () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => UpdateWifiPage()),
-              );
-            }),
-          ],
+
+
           const Spacer(),
           // Always show the Logout option
           _buildDrawerItem(context, Icons.logout, 'Logout', () {

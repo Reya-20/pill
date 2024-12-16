@@ -1,16 +1,18 @@
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
-import 'package:table_calendar/table_calendar.dart'; // Calendar package
+import 'package:table_calendar/table_calendar.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../include/sidebar.dart';
 import 'Alarm_History.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter_speed_dial/flutter_speed_dial.dart'; // Speed Dial package
+import 'package:flutter_speed_dial/flutter_speed_dial.dart';
 import 'add_patient_name.dart';
 import 'add_pill_name.dart';
 import 'add_pill_dashboard.dart';
-import 'package:intl/intl.dart'; // Add this import for time parsing
+import 'package:intl/intl.dart';
+import 'dart:async';
 
 
 void main() {
@@ -21,7 +23,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      debugShowCheckedModeBanner: false, // This removes the debug banner
+      debugShowCheckedModeBanner: false,
       home: HomeCareScreen(),
       theme: ThemeData(
         primaryColor: Color(0xFF0E4C92),
@@ -48,21 +50,34 @@ class _HomeCareScreenState extends State<HomeCareScreen> {
   List<Map<String, dynamic>> alarmData = [];
   bool hasNoAlarms = false;
   DateTime selectedDate = DateTime.now();
-  List<Map<String, dynamic>> _alarms = []; // List to hold alarms
+  List<Map<String, dynamic>> _alarms = [];
+  int newNotificationCount = 0; // Tracks new notifications
+  AudioPlayer _audioPlayer = AudioPlayer(); // Audio player instance
+  late Timer _notificationTimer; // Timer for periodic checks
 
   @override
   void initState() {
     super.initState();
     _fetchAlarmData();
+    _fetchNotificationCount(); // Fetch the notification count on init
+    _startNotificationTimer(); // Start the periodic check
+  }
+  @override
+  void dispose() {
+    _notificationTimer.cancel(); // Cancel the timer when the widget is disposed
+    super.dispose();
   }
 
+  void _startNotificationTimer() {
+    _notificationTimer = Timer.periodic(Duration(seconds: 10), (timer) {
+      _fetchNotificationCount(); // Call this method periodically to check for new notifications
+    });
+  }
   Future<void> _fetchAlarmData() async {
     try {
       final response = await http.get(Uri.parse('https://springgreen-rhinoceros-308382.hostingersite.com/get_alarm.php'));
 
       if (response.statusCode == 200) {
-        print('Response body: ${response.body}');
-
         final Map<String, dynamic> data = json.decode(response.body);
 
         if (data['success'] == true && data['data'] is List) {
@@ -79,97 +94,228 @@ class _HomeCareScreenState extends State<HomeCareScreen> {
                 'reminder_message': reminderMessage,
                 'patient_name': patientName,
                 'pill_name': pillName,
-                'status_remark': alarm['status_remark'] ?? 'Pending',
+                'status_remark': alarm['status_remark'],
               };
             }).toList();
           });
         } else {
-          print('Error: Expected a list of alarms but found something else or success is false.');
           setState(() {
             _alarms = [];
           });
         }
       } else {
-        print('Failed to load reminders. HTTP status: ${response.statusCode}');
         setState(() {
           _alarms = [];
         });
       }
     } catch (e) {
-      print('Error fetching reminders: $e');
       setState(() {
         _alarms = [];
       });
     }
   }
 
-  void _showNotificationDialog() async {
-    // Fetch pill data from the server
+  Future<void> _fetchNotificationCount() async {
     try {
       final response = await http.get(Uri.parse('https://springgreen-rhinoceros-308382.hostingersite.com/get_pill_count.php'));
-
       if (response.statusCode == 200) {
         final Map<String, dynamic> data = json.decode(response.body);
 
         if (data['success'] == true && data['pill_data'] is List) {
-          // Iterate over the pill data to find pills with low quantities
-          String notificationMessage = '';
-
+          int count = 0;
           for (var pill in data['pill_data']) {
-            String pillQuantityStr = pill['pill_quantity']?.toString() ?? '0'; // Ensure it's a string
-            int pillQuantity = int.tryParse(pillQuantityStr) ?? 0; // Convert to int safely
+            int pillQuantity = int.tryParse(pill['pill_quantity']?.toString() ?? '0') ?? 0;
+            if (pillQuantity <= 2) {
+              count++;
+            }
+          }
+          if (count > 0 && count != newNotificationCount) {
+            setState(() {
+              newNotificationCount = count; // Update the notification count
+            });
 
+            try {
+              // Play the sound for the new notification
+              await _audioPlayer.setSource(AssetSource('music/notif.mp3'));
+              await _audioPlayer.play(AssetSource('music/notif.mp3'));
+            } catch (e) {
+              print('Error playing sound: $e');
+            }
+
+            // Show the notification dialog
+            await _showNotificationDialog();
+          }
+        }
+      }
+    } catch (e) {
+      print('Error fetching notification count: $e');
+    }
+  }
+
+
+  Future<void> _showNotificationDialog() async {
+    try {
+      final pillDataResponse = await http.get(
+        Uri.parse('https://springgreen-rhinoceros-308382.hostingersite.com/get_pill_count.php'),
+      );
+
+      final takenPillResponse = await http.get(
+        Uri.parse('https://springgreen-rhinoceros-308382.hostingersite.com/get_alarm_with_patient_pill.php'),
+      );
+
+      if (pillDataResponse.statusCode == 200 && takenPillResponse.statusCode == 200) {
+        final Map<String, dynamic> pillData = json.decode(pillDataResponse.body);
+        final Map<String, dynamic> takenPillData = json.decode(takenPillResponse.body);
+
+        if (pillData['success'] == true && pillData['pill_data'] is List &&
+            takenPillData['success'] == true && takenPillData['data'] is List) {
+
+          List<Map<String, dynamic>> notifications = [];
+          final List takenPills = takenPillData['data'];
+
+          for (var pill in pillData['pill_data']) {
+            String pillQuantityStr = pill['pill_quantity']?.toString() ?? '0';
+            int pillQuantity = int.tryParse(pillQuantityStr) ?? 0;
             String pillName = pill['pill_name'] ?? 'Unknown Pill';
             String containerId = pill['container'] ?? 'Unknown Container';
+            bool isNew = pill['is_new'] ?? false;
 
-            // Check if the pill quantity is 2 or less
+            bool isTaken = takenPills.any((takenPill) {
+              return takenPill['pill_name'] == pillName && takenPill['status_remark'] == 'taken';
+            });
+
             if (pillQuantity <= 2 && pillQuantity > 0) {
-              notificationMessage += 'Warning: $pillName in Container $containerId has low quantity ($pillQuantity pills remaining).\n';
+              notifications.add({
+                'message': '$pillName in Container $containerId needs to be refilled because its pill count is already $pillQuantity.',
+                'isNew': isNew,
+              });
             } else if (pillQuantity == 0) {
-              notificationMessage += 'Alert: $pillName in Container $containerId is out of stock.\n';
+              notifications.add({
+                'message': '$pillName in Container $containerId is out of stock.',
+                'isNew': isNew,
+              });
+            }
+
+            if (isTaken) {
+              final takenPill = takenPills.firstWhere((takenPill) =>
+              takenPill['pill_name'] == pillName && takenPill['status_remark'] == 'taken');
+              String patientName = takenPill['patient_name'] ?? 'Unknown Patient';
+
+              notifications.add({
+                'message': '$pillName has already been taken by $patientName.',
+                'isNew': isNew,
+              });
             }
           }
 
-          if (notificationMessage.isEmpty) {
-            notificationMessage = 'All pills are well stocked!';
+          if (notifications.isEmpty) {
+            notifications.add({
+              'message': 'All pills are well stocked!',
+              'isNew': false,
+            });
           }
 
-          // Show dialog with the appropriate message
+          notifications.sort((a, b) => (b['isNew'] as bool) ? 1 : -1);
+
           showDialog(
             context: context,
             builder: (BuildContext context) {
-              return AlertDialog(
-                title: Text('Pill Stock Notification'),
-                content: Text(notificationMessage),
-                actions: <Widget>[
-                  TextButton(
-                    child: Text('OK'),
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                    },
-                  ),
-                ],
+              return Dialog(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16.0),
+                ),
+                child: StatefulBuilder(
+                  builder: (context, setState) {
+                    return Container(
+                      width: MediaQuery.of(context).size.width * 0.8,
+                      height: MediaQuery.of(context).size.height * 0.6,
+                      padding: EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'PillCare System Notification',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.green,
+                              fontSize: 20.0,
+                            ),
+                          ),
+                          SizedBox(height: 10.0),
+                          Expanded(
+                            child: ListView.builder(
+                              itemCount: notifications.length,
+                              itemBuilder: (context, index) {
+                                final notification = notifications[index];
+                                final isNew = notification['isNew'] as bool;
+
+                                return Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 6.0),
+                                  child: Card(
+                                    color: isNew ? Colors.yellow[100] : Colors.white,
+                                    elevation: 3,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8.0),
+                                    ),
+                                    child: Padding(
+                                      padding: EdgeInsets.all(12.0),
+                                      child: Text(
+                                        notification['message'] as String,
+                                        style: TextStyle(
+                                          fontSize: 16.0,
+                                          color: Colors.black87,
+                                          fontWeight: isNew ? FontWeight.bold : FontWeight.normal,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                          SizedBox(height: 10.0),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              TextButton(
+                                child: Text('Clear'),
+                                onPressed: () {
+                                  setState(() {
+                                    notifications.clear();
+                                  });
+                                },
+                              ),
+                              TextButton(
+                                child: Text('OK'),
+                                onPressed: () {
+                                  Navigator.of(context).pop();
+                                },
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
               );
             },
           );
         } else {
-          // If the data format is incorrect
-          print('Error: Pill data is missing or malformed.');
+          print('Error: Pill data or taken pill data is missing or malformed.');
         }
       } else {
-        print('Failed to fetch pill data. HTTP status: ${response.statusCode}');
+        print('Failed to fetch data. HTTP status: ${pillDataResponse.statusCode}, ${takenPillResponse.statusCode}');
       }
     } catch (e) {
       print('Error fetching pill data: $e');
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       key: _scaffoldKey,
-      backgroundColor: Colors.transparent,
       drawer: CustomDrawer(
         scaffoldKey: _scaffoldKey,
         flutterLocalNotificationsPlugin: flutterLocalNotificationsPlugin,
@@ -196,9 +342,33 @@ class _HomeCareScreenState extends State<HomeCareScreen> {
                     },
                   ),
                   Spacer(),
-                  IconButton(
-                    icon: Icon(Icons.notifications, color: Colors.white),
-                    onPressed: _showNotificationDialog,
+                  Stack(
+                    children: [
+                      IconButton(
+                        icon: Icon(Icons.notifications, color: Colors.white),
+                        onPressed: _showNotificationDialog,
+                      ),
+                      if (newNotificationCount > 0)
+                        Positioned(
+                          right: 8,
+                          top: 8,
+                          child: Container(
+                            padding: EdgeInsets.all(5),
+                            decoration: BoxDecoration(
+                              color: Colors.red,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Text(
+                              '$newNotificationCount',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ],
               ),
@@ -362,7 +532,7 @@ class _HomeCareScreenState extends State<HomeCareScreen> {
             ),
             // Status Remark display on the right
             Text(
-              alarm['status_remark'] ?? 'No Status',
+              alarm['status_remark'],
               style: TextStyle(
                 color: Colors.green,
                 fontSize: 12,

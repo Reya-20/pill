@@ -25,7 +25,8 @@ class _PatientScreenState extends State<PatientScreen> {
   }
 
   Future<void> _fetchPatients() async {
-    final url = Uri.parse('https://springgreen-rhinoceros-308382.hostingersite.com/get_patient.php');
+    final url = Uri.parse(
+        'https://springgreen-rhinoceros-308382.hostingersite.com/get_patient.php');
 
     try {
       final response = await http.get(url);
@@ -34,11 +35,12 @@ class _PatientScreenState extends State<PatientScreen> {
       if (response.statusCode == 200) {
         final responseData = json.decode(response.body);
         setState(() {
-          _patientList = (responseData as List<dynamic>).map((patient) => {
+          _patientList = (responseData as List<dynamic>).map((patient) =>
+          {
             'name': patient['patient_name'] ?? '',
             'username': patient['username'] ?? '',
             'password': patient['password'] ?? '',
-            'isActive': true, // Default to active
+
           }).toList();
         });
       } else {
@@ -79,8 +81,10 @@ class _PatientScreenState extends State<PatientScreen> {
     }
   }
 
-  Future<void> _uploadPatient(String name, String username, String password) async {
-    final url = Uri.parse('https://springgreen-rhinoceros-308382.hostingersite.com/post_patient.php'); // Ensure this URL is correct.
+  Future<void> _uploadPatient(String name, String username,
+      String password) async {
+    final url = Uri.parse(
+        'https://springgreen-rhinoceros-308382.hostingersite.com/post_patient.php'); // Ensure this URL is correct.
 
     try {
       final response = await http.post(
@@ -228,7 +232,8 @@ class _PatientScreenState extends State<PatientScreen> {
                         leading: CircleAvatar(
                           backgroundColor: Color(0xFF0E4C92),
                           foregroundColor: Colors.white,
-                          child: Icon(Icons.person, size: 20), // Circle icon for patient
+                          child: Icon(Icons.person,
+                              size: 20), // Circle icon for patient
                         ),
                         title: Text(
                           patient['name'],
@@ -238,33 +243,18 @@ class _PatientScreenState extends State<PatientScreen> {
                             color: Color(0xFF26394A),
                           ),
                         ),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            ElevatedButton(
-                              onPressed: () {
-                                setState(() {
-                                  patient['isActive'] = !(patient['isActive'] ?? true); // Toggle active state
-                                });
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      '${patient['name']} is now ${patient['isActive']! ? 'Active' : 'Inactive'}',
-                                    ),
-                                    backgroundColor: patient['isActive']! ? Colors.green : Colors.orange,
-                                  ),
-                                );
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: patient['isActive'] ?? true ? Colors.green : Colors.red,
+                        trailing: IconButton(
+                          icon: Icon(Icons.delete, color: Colors.red),
+                          onPressed: () {
+                            _deletePatient(index);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                    '${patient['name']} deleted successfully'),
+                                backgroundColor: Colors.red,
                               ),
-                              child: Text(
-                                patient['isActive'] ?? true ? 'Active' : 'Inactive',
-                                style: TextStyle(color: Colors.white),
-                              ),
-                            ),
-
-                          ],
+                            );
+                          },
                         ),
                       ),
                     );

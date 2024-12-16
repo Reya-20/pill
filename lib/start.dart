@@ -5,7 +5,7 @@ import 'register.dart'; // Import your registration screen
 import 'user/user_dashboard.dart'; // Import user dashboard
 import 'caregiver/caregiver_dashboard.dart'; // Import caregiver dashboard
 import 'dart:async'; // For Timer functionality
-
+import 'superadmin/HomePage.dart'; // Superadmin Dashboard
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -66,6 +66,11 @@ class _LoginScreenState extends State<LoginScreen> {
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(builder: (context) => HomeCareScreen()), // Caregiver Dashboard
+            );
+          } else if (result['role'] == '2') {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => DashboardScreen()), // Superadmin Dashboard
             );
           }
         } else {
@@ -237,36 +242,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                // Registration Prompt
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Text(
-                      "Don't have an account? ",
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                      ),
-                    ),
-                    GestureDetector(
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => CreateAccountScreen()),
-                        );
-                      },
-                      child: const Text(
-                        "Register",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          decoration: TextDecoration.underline,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
               ],
             ),
           ),
